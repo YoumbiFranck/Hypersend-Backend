@@ -1,0 +1,39 @@
+services:
+  hps_postgres:  # Name des Services
+    container_name: hps_postgres_db  # Name des Containers
+    image: postgres  # Image
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}  # Username für PostgreSQL
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # Passwort für PostgreSQL
+      PGDATA: /data/hps_postgres  # Datenverzeichnis (Zugriff auf das Volume)
+    volumes:
+      - hps_postgres_data:/data/hps_postgres  # Neues Volume
+      - ./init:/docker-entrypoint-initdb.d
+    ports:
+      - "${POSTGRES_PORT}:5432"  # Änderung des Ports auf dem Host
+    networks:
+      - hps_postgres_network  # Neuer Netzwerk
+    restart: unless-stopped
+
+  hps_pgadmin:  # Änderung des Namens des Services
+    container_name: hps_pgadmin  # Name des Containers
+    image: dpage/pgadmin4  # Selected pgAdmin image
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    volumes:
+      - hps_pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "5051:80"  # Port für pgAdmin auf dem Host
+    networks:
+      - hps_postgres_network  # Neuer Netzwerk
+    restart: unless-stopped
+
+networks:
+  hps_postgres_network:  # Neuer Netzwerkname
+    driver: bridge
+
+volumes:
+  hps_postgres_data:  # Neues Volume für PostgreSQL
+  hps_pgadmin_data:    # Neues Volume für pgAdmin

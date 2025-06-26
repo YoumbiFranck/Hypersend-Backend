@@ -13,6 +13,7 @@
 
   <modules>
     <module>register_user</module>
+    <module>login_user</module>
   </modules>
 
 

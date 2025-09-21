@@ -1,33 +1,85 @@
+# Default profile configuration (for local development with IDE)
 server:
-  port: 8082
+  port: 8081  # Change to 8082 for login_user service
 
 spring:
   application:
-    name: users
+    name: register-user-service  # Change for each service
 
   datasource:
-    url: jdbc:postgresql://localhost:5433/users  # Port mappé sur l'hôte
-    username: ${POSTGRES_USER:user_1}
-    password: ${POSTGRES_PASSWORD:pass_1}
+    url: jdbc:postgresql://localhost:5433/hypersend
+    username: ${POSTGRES_USER:hypersend_user}
+    password: ${POSTGRES_PASSWORD:hypersend_password}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
-      pool-name: HikariPool-Users
+      pool-name: HikariPool-RegisterUser
       minimum-idle: 2
 
   jpa:
     hibernate:
-      ddl-auto: update
+      # Use 'validate' in production, 'update' in development
+      ddl-auto: validate  # Don't auto-create tables, use SQL scripts instead
     show-sql: true
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
 
   jackson:
     serialization:
       indent_output: true
 
+# Logging configuration
+logging:
+  level:
+    com.thm_modul: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+---
+# Docker profile configuration (when running inside containers)
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://hps_postgres:5432/hypersend}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: HikariPool-Docker
+      minimum-idle: 2
+
+  jpa:
+    hibernate:
+      ddl-auto: validate  # Database already initialized by SQL scripts
+    show-sql: false  # Less verbose in containers
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+  jackson:
+    serialization:
+      indent_output: false
+
+# Logging configuration for containerized environment
+logging:
+  level:
+    com.thm_modul: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

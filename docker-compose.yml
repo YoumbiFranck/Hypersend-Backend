@@ -1,7 +1,8 @@
 services:
+  # PostgreSQL Database
   hps_postgres:
     container_name: hps_postgres_db
-    image: postgres
+    image: postgres:15-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -12,9 +13,15 @@ services:
     ports:
       - "${POSTGRES_PORT}:5432"
     networks:
-      - hps_postgres_network
+      - hps_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # pgAdmin
   hps_pgadmin:
     container_name: hps_pgadmin
     image: dpage/pgadmin4
@@ -22,18 +29,111 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
       PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
     volumes:
       - hps_pgadmin_data:/var/lib/pgadmin
     ports:
       - "5051:80"
     networks:
-      - hps_postgres_network
+      - hps_network
     restart: unless-stopped
+    depends_on:
+      - hps_postgres
+
+  # Register User Microservice
+  register-user-service:
+    container_name: hps_register_user
+    build:
+      context: .
+      dockerfile: Dockerfile.register_user
+    ports:
+      - "8081:8081"
+    networks:
+      - hps_network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://hps_postgres:5432/${POSTGRES_DB:-hypersend}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - SERVER_PORT=8082
+      - SERVER_PORT=8081
+    volumes:
+      # Mount source code for hot reload during development
+      - ./register_user/src:/app/register_user/src
+      - ./pom.xml:/app/pom.xml
+      - ./register_user/pom.xml:/app/register_user/pom.xml
+      # Maven cache volume for faster builds
+      - maven_cache:/root/.m2
+    depends_on:
+      hps_postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  # Login User Microservice
+  login-user-service:
+    container_name: hps_login_user
+    build:
+      context: .
+      dockerfile: Dockerfile.login_user
+    ports:
+      - "8082:8082"
+    networks:
+      - hps_network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://hps_postgres:5432/${POSTGRES_DB:-hypersend}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      # Mount source code for hot reload during development
+      - ./login_user/src:/app/login_user/src
+      - ./pom.xml:/app/pom.xml
+      - ./login_user/pom.xml:/app/login_user/pom.xml
+      # Maven cache volume for faster builds
+      - maven_cache:/root/.m2
+    depends_on:
+      hps_postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  # Placeholder for third microservice
+  # third-service:
+  #   container_name: hps_third_service
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.third_service
+  #   ports:
+  #     - "8083:8083"
+  #   networks:
+  #     - hps_network
+  #   environment:
+  #     - SPRING_PROFILES_ACTIVE=docker
+  #     - SPRING_DATASOURCE_URL=jdbc:postgresql://hps_postgres:5432/${POSTGRES_DB:-hypersend}
+  #     - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+  #     - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+  #   volumes:
+  #     - ./third_service/src:/app/third_service/src
+  #     - ./pom.xml:/app/pom.xml
+  #     - ./third_service/pom.xml:/app/third_service/pom.xml
+  #     - maven_cache:/root/.m2
+  #   depends_on:
+  #     hps_postgres:
+  #       condition: service_healthy
+  #   restart: unless-stopped
 
 networks:
-  hps_postgres_network:
+  hps_network:
     driver: bridge
+    name: hypersend_network
 
 volumes:
-  hps_postgres_data:  # Neues Volume für PostgreSQL
-  hps_pgadmin_data:    # Neues Volume für pgAdmin
+  hps_postgres_data:
+    name: hypersend_postgres_data
+  hps_pgadmin_data:
+    name: hypersend_pgadmin_data
+  maven_cache:
+    name: hypersend_maven_cache

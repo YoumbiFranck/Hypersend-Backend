@@ -1,0 +1,25 @@
+# Dockerfile for login_user microservice
+FROM openjdk:17-jdk-slim
+
+# Install Maven for development mode
+RUN apt-get update && apt-get install -y maven && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy parent pom first for dependency resolution
+COPY pom.xml .
+COPY login_user/pom.xml ./login_user/
+
+# Download dependencies (this layer will be cached if pom.xml doesn't change)
+RUN mvn dependency:go-offline -f login_user/pom.xml
+
+# Copy source code
+COPY login_user/src ./login_user/src
+
+# Expose port
+EXPOSE 8082
+
+# Development mode with hot reload
+# Using spring-boot:run with fork=false for faster startup
+CMD ["mvn", "-f", "login_user/pom.xml", "spring-boot:run", "-Dspring-boot.run.fork=false"]

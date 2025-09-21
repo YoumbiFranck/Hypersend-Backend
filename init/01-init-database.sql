@@ -38,3 +38,19 @@ CREATE INDEX IF NOT EXISTS idx_app_user_username ON app_user(user_name);
 -- Grant permissions to the application user
 GRANT ALL PRIVILEGES ON TABLE app_user TO hypersend_user;
 GRANT ALL PRIVILEGES ON SEQUENCE user_id_sequence TO hypersend_user;
+
+CREATE TABLE IF NOT EXISTS messages (
+                                        id BIGSERIAL PRIMARY KEY,
+                                        sender_id INTEGER NOT NULL,
+                                        receiver_id INTEGER NOT NULL,
+                                        content TEXT NOT NULL,
+                                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                        FOREIGN KEY (sender_id) REFERENCES app_user(id),
+    FOREIGN KEY (receiver_id) REFERENCES app_user(id)
+    );
+
+CREATE INDEX IF NOT EXISTS idx_messages_sender_receiver
+    ON messages(sender_id, receiver_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at
+    ON messages(created_at DESC);

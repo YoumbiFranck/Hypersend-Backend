@@ -100,30 +100,30 @@ services:
     stdin_open: true
     tty: true
 
-  # Placeholder for third microservice
-  # third-service:
-  #   container_name: hps_third_service
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.third_service
-  #   ports:
-  #     - "8083:8083"
-  #   networks:
-  #     - hps_network
-  #   environment:
-  #     - SPRING_PROFILES_ACTIVE=docker
-  #     - SPRING_DATASOURCE_URL=jdbc:postgresql://hps_postgres:5432/${POSTGRES_DB:-hypersend}
-  #     - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
-  #     - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
-  #   volumes:
-  #     - ./third_service/src:/app/third_service/src
-  #     - ./pom.xml:/app/pom.xml
-  #     - ./third_service/pom.xml:/app/third_service/pom.xml
-  #     - maven_cache:/root/.m2
-  #   depends_on:
-  #     hps_postgres:
-  #       condition: service_healthy
-  #   restart: unless-stopped
+  # Message Microservice
+  message-service:
+    container_name: hps_message_service
+    build:
+      context: .
+      dockerfile: Dockerfile.message_service
+    ports:
+      - "8083:8083"
+    networks:
+      - hps_network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://hps_postgres:5432/${POSTGRES_DB:-hypersend}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ./message_service/src:/app/message_service/src
+      - ./pom.xml:/app/pom.xml
+      - ./message_service/pom.xml:/app/message_service/pom.xml
+      - maven_cache:/root/.m2
+    depends_on:
+      hps_postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
 networks:
   hps_network:

@@ -44,26 +44,24 @@ public class AuthService {
 
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
 
-            // Récupération de l'utilisateur pour mise à jour du lastLogin
             User user = userRepository.findByUserNameOrEmail(
                     loginRequest.usernameOrEmail(),
                     loginRequest.usernameOrEmail()
             ).orElseThrow(() -> new BadCredentialsException("User not found"));
 
-            // Mise à jour du dernier login
             user.setLastLogin(LocalDateTime.now());
             userRepository.save(user);
 
-            // Génération des tokens
-            String accessToken = jwtUtil.generateToken(userDetails);
-            String refreshToken = jwtUtil.generateRefreshToken(userDetails);
+            // Generate JWT tokens with user ID
+            String accessToken = jwtUtil.generateToken(userDetails, user.getId());
+            String refreshToken = jwtUtil.generateRefreshToken(userDetails, user.getId());
 
             log.info("Login successful for user: {}", user.getUserName());
 
             return LoginResponse.of(
                     accessToken,
                     refreshToken,
-                    86400, // 24h en secondes
+                    86400, // 24h
                     user.getUserName(),
                     user.getEmail()
             );
@@ -82,10 +80,13 @@ public class AuthService {
         }
 
         String username = jwtUtil.extractUsername(refreshToken);
+        Integer userId = jwtUtil.getUserIdFromToken(refreshToken);
+
         UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-        String newAccessToken = jwtUtil.generateToken(userDetails);
-        String newRefreshToken = jwtUtil.generateRefreshToken(userDetails);
+        // generate new tokens with user ID
+        String newAccessToken = jwtUtil.generateToken(userDetails, userId);
+        String newRefreshToken = jwtUtil.generateRefreshToken(userDetails, userId);
 
         User user = userRepository.findByUserNameOrEmail(username, username)
                 .orElseThrow(() -> new BadCredentialsException("User not found"));

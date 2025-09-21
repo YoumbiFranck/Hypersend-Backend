@@ -1,4 +1,3 @@
-// LoginResponse.java
 package com.thm_modul.login_service.dto;
 
 public record LoginResponse(

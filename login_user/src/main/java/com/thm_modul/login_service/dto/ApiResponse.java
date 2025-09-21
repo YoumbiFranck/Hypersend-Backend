@@ -1,4 +1,3 @@
-// ApiResponse.java
 package com.thm_modul.login_service.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;

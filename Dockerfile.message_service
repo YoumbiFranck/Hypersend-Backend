@@ -1,0 +1,10 @@
+# Dockerfile.message_service
+FROM openjdk:17-jdk-slim
+RUN apt-get update && apt-get install -y maven && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY pom.xml .
+COPY message_service/pom.xml ./message_service/
+RUN mvn dependency:go-offline -f message_service/pom.xml
+COPY message_service/src ./message_service/src
+EXPOSE 8083
+CMD ["mvn", "-f", "message_service/pom.xml", "spring-boot:run", "-Dspring-boot.run.fork=false"]

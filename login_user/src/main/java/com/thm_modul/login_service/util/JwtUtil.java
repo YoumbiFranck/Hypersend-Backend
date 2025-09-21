@@ -42,6 +42,25 @@ public class JwtUtil {
         return extractClaim(token, Claims::getExpiration);
     }
 
+    /**
+     * Extract user ID from JWT token claims
+     * @param token Token JWT
+     * @return User ID or null if not found/invalid
+     */
+    public Integer getUserIdFromToken(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            Object userIdObj = claims.get("userId");
+            if (userIdObj != null) {
+                return Integer.valueOf(userIdObj.toString());
+            }
+            return null;
+        } catch (Exception e) {
+            log.error("Error extracting user ID from token: {}", e.getMessage());
+            return null;
+        }
+    }
+
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
@@ -64,9 +83,34 @@ public class JwtUtil {
         return createToken(claims, userDetails.getUsername(), jwtExpiration);
     }
 
+    /**
+     * Token with user ID included
+     * @param userDetails user details
+     * @param userId user ID to include
+     * @return token JWT
+     */
+    public String generateToken(UserDetails userDetails, Integer userId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        return createToken(claims, userDetails.getUsername(), jwtExpiration);
+    }
+
     public String generateRefreshToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("type", "refresh");
+        return createToken(claims, userDetails.getUsername(), refreshExpiration);
+    }
+
+    /**
+     * Generate refresh token with user ID included
+     * @param userDetails user details
+     * @param userId user ID to include
+     * @return refresh token JWT
+     */
+    public String generateRefreshToken(UserDetails userDetails, Integer userId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("type", "refresh");
+        claims.put("userId", userId);
         return createToken(claims, userDetails.getUsername(), refreshExpiration);
     }
 

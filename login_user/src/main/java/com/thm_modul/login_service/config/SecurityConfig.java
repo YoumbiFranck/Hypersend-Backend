@@ -45,28 +45,14 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authz -> authz
-                        .antMatchers("/api/v1/auth/**").permitAll()
+                        .antMatchers("/api/v1/auth/login").permitAll()
+                        .antMatchers("/api/v1/auth/refresh").permitAll()
+                        .antMatchers("/api/v1/auth/validate-user/**").permitAll()
+                        .antMatchers("/api/v1/auth/user-info/**").permitAll()
                         .antMatchers("/actuator/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
                 .build();
     }
-
-    // Alternative pour Spring Security 6.x+ (si requestMatchers ne fonctionne pas)
-    /*
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        return http
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(authz -> authz
-                .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
-                .requestMatchers("/actuator/**").permitAll()
-                .anyRequest().authenticated()
-            )
-            .authenticationProvider(authenticationProvider())
-            .build();
-    }
-    */
 }

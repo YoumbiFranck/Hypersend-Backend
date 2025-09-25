@@ -67,6 +67,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
 
-        return path.startsWith("/actuator/");
+        return path.startsWith("/actuator/") || path.equals("/api/v1/messages/health"); // Skip filtering for actuator and health endpoints
     }
 }

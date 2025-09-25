@@ -24,7 +24,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authz -> authz
                         .antMatchers("/actuator/**").permitAll()
-                        .anyRequest().authenticated()
+                        .antMatchers("/api/v1/messages/health").permitAll()
+                        .anyRequest().authenticated() // All other requests require authentication
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

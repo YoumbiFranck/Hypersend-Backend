@@ -8,7 +8,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import java.security.InvalidParameterException;
 import org.springframework.web.bind.annotation.*;
+import lombok.extern.slf4j.Slf4j;
+import com.thm_modul.login_service.dto.ApiResponse;
 
 import javax.validation.Valid;
 
@@ -16,7 +19,7 @@ import javax.validation.Valid;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
-public class AuthController {
+public class InternalAuthController {
 
     private final AuthService authService;
     private final UserRepository userRepository;

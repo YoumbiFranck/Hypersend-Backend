@@ -8,12 +8,10 @@ import com.thm_modul.login_service.repository.UserRepository;
 import com.thm_modul.login_service.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,54 +22,67 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
+    private final PasswordEncoder passwordEncoder;
 
+    /**
+     * Authenticate user and generate JWT tokens
+     * Now handles authentication without Spring Security's AuthenticationManager
+     */
     @Transactional
     public LoginResponse login(LoginRequest loginRequest) {
-        log.info("Attempting login for user: {}", loginRequest.usernameOrEmail());
+        log.debug("Attempting login for user: {}", loginRequest.usernameOrEmail());
 
         try {
-            // Authentification
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            loginRequest.usernameOrEmail(),
-                            loginRequest.password()
-                    )
-            );
-
-            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-
+            // Find user by username or email
             User user = userRepository.findByUserNameOrEmail(
                     loginRequest.usernameOrEmail(),
                     loginRequest.usernameOrEmail()
             ).orElseThrow(() -> new BadCredentialsException("User not found"));
 
+            // Check if user is enabled
+            if (!user.getEnabled()) {
+                throw new BadCredentialsException("User account is disabled");
+            }
+
+            // Verify password manually since we don't have AuthenticationManager
+            if (!passwordEncoder.matches(loginRequest.password(), user.getPassword())) {
+                throw new BadCredentialsException("Invalid password");
+            }
+
+            // Update last login timestamp
             user.setLastLogin(LocalDateTime.now());
             userRepository.save(user);
 
-            // Generate JWT tokens with user ID
+            // Generate tokens with user ID included
+            UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUserName());
             String accessToken = jwtUtil.generateToken(userDetails, user.getId());
             String refreshToken = jwtUtil.generateRefreshToken(userDetails, user.getId());
 
-            log.info("Login successful for user: {}", user.getUserName());
+            log.info("Login successful for user: {} (ID: {})", user.getUserName(), user.getId());
 
             return LoginResponse.of(
                     accessToken,
                     refreshToken,
-                    86400, // 24h
+                    86400, // 24h in seconds
                     user.getUserName(),
                     user.getEmail()
             );
 
         } catch (BadCredentialsException e) {
-            log.warn("Login failed for user: {} - Invalid credentials", loginRequest.usernameOrEmail());
-            throw new BadCredentialsException("Invalid username/email or password");
+            log.warn("Login failed for user: {} - {}", loginRequest.usernameOrEmail(), e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during login for user: {}", loginRequest.usernameOrEmail(), e);
+            throw new BadCredentialsException("Authentication failed");
         }
     }
 
+    /**
+     * Refresh JWT tokens
+     */
     public LoginResponse refreshToken(RefreshTokenRequest refreshTokenRequest) {
         String refreshToken = refreshTokenRequest.refreshToken();
 
@@ -79,24 +90,73 @@ public class AuthService {
             throw new BadCredentialsException("Invalid refresh token");
         }
 
-        String username = jwtUtil.extractUsername(refreshToken);
-        Integer userId = jwtUtil.getUserIdFromToken(refreshToken);
+        try {
+            String username = jwtUtil.extractUsername(refreshToken);
+            Integer userId = jwtUtil.getUserIdFromToken(refreshToken);
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            if (username == null || userId == null) {
+                throw new BadCredentialsException("Invalid refresh token claims");
+            }
 
-        // generate new tokens with user ID
-        String newAccessToken = jwtUtil.generateToken(userDetails, userId);
-        String newRefreshToken = jwtUtil.generateRefreshToken(userDetails, userId);
+            // Verify user still exists and is enabled
+            User user = userRepository.findByIdAndEnabledTrue(userId)
+                    .orElseThrow(() -> new BadCredentialsException("User not found or disabled"));
 
-        User user = userRepository.findByUserNameOrEmail(username, username)
-                .orElseThrow(() -> new BadCredentialsException("User not found"));
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-        return LoginResponse.of(
-                newAccessToken,
-                newRefreshToken,
-                86400,
-                user.getUserName(),
-                user.getEmail()
-        );
+            // Generate new tokens
+            String newAccessToken = jwtUtil.generateToken(userDetails, userId);
+            String newRefreshToken = jwtUtil.generateRefreshToken(userDetails, userId);
+
+            log.debug("Token refresh successful for user: {} (ID: {})", username, userId);
+
+            return LoginResponse.of(
+                    newAccessToken,
+                    newRefreshToken,
+                    86400,
+                    user.getUserName(),
+                    user.getEmail()
+            );
+
+        } catch (Exception e) {
+            log.warn("Token refresh failed: {}", e.getMessage());
+            throw new BadCredentialsException("Token refresh failed");
+        }
+    }
+
+    /**
+     * Validate user credentials (without generating tokens)
+     * Useful for internal validations
+     */
+    public boolean validateCredentials(String usernameOrEmail, String password) {
+        try {
+            User user = userRepository.findByUserNameOrEmail(usernameOrEmail, usernameOrEmail)
+                    .orElse(null);
+
+            return user != null
+                    && user.getEnabled()
+                    && passwordEncoder.matches(password, user.getPassword());
+
+        } catch (Exception e) {
+            log.warn("Error validating credentials for user: {}", usernameOrEmail, e);
+            return false;
+        }
+    }
+
+    /**
+     * Get user information by ID
+     * Used by other services for user data retrieval
+     */
+    @Transactional(readOnly = true)
+    public User getUserById(Integer userId) {
+        return userRepository.findByIdAndEnabledTrue(userId).orElse(null);
+    }
+
+    /**
+     * Check if user exists and is enabled
+     */
+    @Transactional(readOnly = true)
+    public boolean userExists(Integer userId) {
+        return userRepository.existsByIdAndEnabledTrue(userId);
     }
 }

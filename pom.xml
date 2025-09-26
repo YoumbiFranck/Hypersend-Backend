@@ -15,6 +15,7 @@
     <module>register_user</module>
     <module>login_user</module>
     <module>message_service</module>
+    <module>api_gateway</module>
   </modules>
 
   <properties>

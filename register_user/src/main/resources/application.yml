@@ -1,10 +1,10 @@
 # Default profile configuration (for local development with IDE)
 server:
-  port: 8081  # Change to 8082 for login_user service
+  port: 8081
 
 spring:
   application:
-    name: register-user-service  # Change for each service
+    name: register-service
 
   datasource:
     url: jdbc:postgresql://localhost:5433/hypersend
@@ -21,8 +21,7 @@ spring:
 
   jpa:
     hibernate:
-      # Use 'validate' in production, 'update' in development
-      ddl-auto: validate  # Don't auto-create tables, use SQL scripts instead
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
@@ -34,13 +33,42 @@ spring:
     serialization:
       indent_output: true
 
+# Application configuration
+app:
+  # Gateway authentication secret for internal communications
+  gateway:
+    secret: ${GATEWAY_SECRET:shared_secret_key}
+
+  # User validation settings
+  validation:
+    password:
+      min-length: 8
+      max-length: 255
+    username:
+      min-length: 3
+      max-length: 50
+    email:
+      max-length: 255
+
 # Logging configuration
 logging:
   level:
-    com.thm_modul: DEBUG
+    com.thm_modul.register_user: DEBUG
     org.springframework.security: INFO
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management endpoints configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
 
 ---
 # Docker profile configuration (when running inside containers)
@@ -59,13 +87,13 @@ spring:
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
-      pool-name: HikariPool-Docker
+      pool-name: HikariPool-RegisterUser-Docker
       minimum-idle: 2
 
   jpa:
     hibernate:
-      ddl-auto: validate  # Database already initialized by SQL scripts
-    show-sql: false  # Less verbose in containers
+      ddl-auto: validate
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -75,11 +103,34 @@ spring:
     serialization:
       indent_output: false
 
+# Application configuration (same for all profiles)
+app:
+  gateway:
+    secret: ${GATEWAY_SECRET:shared_secret_key}
+  validation:
+    password:
+      min-length: 8
+      max-length: 255
+    username:
+      min-length: 3
+      max-length: 50
+    email:
+      max-length: 255
+
 # Logging configuration for containerized environment
 logging:
   level:
-    com.thm_modul: DEBUG
+    com.thm_modul.register_user: DEBUG
     org.springframework.security: INFO
-    org.hibernate.SQL: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management endpoints (same for all profiles)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

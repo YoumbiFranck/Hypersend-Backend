@@ -1,10 +1,7 @@
-package com.thm_modul.message_service.controller;
+package com.thm_modul.api_gateway.controller;
 
-import com.thm_modul.message_service.dto.ApiResponse;
-import com.thm_modul.message_service.dto.ConversationResponse;
-import com.thm_modul.message_service.dto.MessageRequest;
-import com.thm_modul.message_service.dto.MessageResponse;
-import com.thm_modul.message_service.service.MessageService;
+import com.thm_modul.api_gateway.dto.ApiResponse;
+import com.thm_modul.api_gateway.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -15,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.validation.Valid;
 import javax.validation.constraints.Max;
 import javax.validation.constraints.Min;
-import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -27,23 +24,23 @@ public class MessageController {
 
     /**
      * Send a new message to another user
-     * Authentication required - sender ID extracted from JWT token
+     * Requires authentication
      */
     @PostMapping("/send")
-    public ResponseEntity<ApiResponse<MessageResponse>> sendMessage(
-            @Valid @RequestBody MessageRequest messageRequest,
+    public ResponseEntity<ApiResponse<Object>> sendMessage(
+            @Valid @RequestBody Map<String, Object> messageRequest,
             Authentication authentication) {
 
         try {
-            // Extract sender ID from authentication (set by JWT filter)
             Integer senderId = (Integer) authentication.getPrincipal();
+            String senderUsername = (String) authentication.getCredentials();
 
-            log.info("User {} sending message to user {}", senderId, messageRequest.receiverId());
+            log.info("User {} sending message to user {}", senderId, messageRequest.get("receiverId"));
 
-            MessageResponse response = messageService.sendMessage(senderId, messageRequest);
+            Object messageResponse = messageService.sendMessage(senderId, senderUsername, messageRequest);
 
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(ApiResponse.success("Message sent successfully", response));
+                    .body(ApiResponse.success("Message sent successfully", messageResponse));
 
         } catch (IllegalArgumentException e) {
             log.warn("Invalid message request: {}", e.getMessage());
@@ -59,19 +56,19 @@ public class MessageController {
 
     /**
      * Get conversation between authenticated user and another user
-     * Returns full conversation with all messages
      */
     @GetMapping("/conversation/{otherUserId}")
-    public ResponseEntity<ApiResponse<ConversationResponse>> getConversation(
+    public ResponseEntity<ApiResponse<Object>> getConversation(
             @PathVariable Integer otherUserId,
             Authentication authentication) {
 
         try {
             Integer userId = (Integer) authentication.getPrincipal();
+            String username = (String) authentication.getCredentials();
 
             log.debug("User {} requesting conversation with user {}", userId, otherUserId);
 
-            ConversationResponse conversation = messageService.getConversation(userId, otherUserId);
+            Object conversation = messageService.getConversation(userId, username, otherUserId);
 
             return ResponseEntity.ok(ApiResponse.success("Conversation retrieved successfully", conversation));
 
@@ -89,10 +86,9 @@ public class MessageController {
 
     /**
      * Get conversation with pagination support
-     * Useful for large conversations to avoid loading all messages at once
      */
     @GetMapping("/conversation/{otherUserId}/paginated")
-    public ResponseEntity<ApiResponse<ConversationResponse>> getConversationPaginated(
+    public ResponseEntity<ApiResponse<Object>> getConversationPaginated(
             @PathVariable Integer otherUserId,
             @RequestParam(defaultValue = "0") @Min(0) Integer page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer size,
@@ -100,12 +96,12 @@ public class MessageController {
 
         try {
             Integer userId = (Integer) authentication.getPrincipal();
+            String username = (String) authentication.getCredentials();
 
             log.debug("User {} requesting paginated conversation with user {} (page: {}, size: {})",
                     userId, otherUserId, page, size);
 
-            ConversationResponse conversation = messageService.getConversationWithPagination(
-                    userId, otherUserId, page, size);
+            Object conversation = messageService.getConversationPaginated(userId, username, otherUserId, page, size);
 
             return ResponseEntity.ok(ApiResponse.success("Conversation page retrieved successfully", conversation));
 
@@ -123,25 +119,19 @@ public class MessageController {
 
     /**
      * Get list of all conversations for the authenticated user
-     * Returns conversation summaries without full message content
      */
     @GetMapping("/conversations")
-    public ResponseEntity<ApiResponse<List<ConversationResponse>>> getUserConversations(
-            Authentication authentication) {
+    public ResponseEntity<ApiResponse<Object>> getUserConversations(Authentication authentication) {
 
         try {
             Integer userId = (Integer) authentication.getPrincipal();
+            String username = (String) authentication.getCredentials();
 
             log.debug("User {} requesting all conversations", userId);
 
-            List<ConversationResponse> conversations = messageService.getUserConversations(userId);
+            Object conversations = messageService.getUserConversations(userId, username);
 
             return ResponseEntity.ok(ApiResponse.success("Conversations retrieved successfully", conversations));
-
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid user conversations request: {}", e.getMessage());
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("Invalid request: " + e.getMessage()));
 
         } catch (Exception e) {
             log.error("Error retrieving user conversations: {}", e.getMessage(), e);
@@ -151,27 +141,22 @@ public class MessageController {
     }
 
     /**
-     * Get user's message history (both sent and received messages)
-     * Useful for user profile or message search functionality
+     * Get user's message history
      */
     @GetMapping("/history")
-    public ResponseEntity<ApiResponse<List<MessageResponse>>> getMessageHistory(
+    public ResponseEntity<ApiResponse<Object>> getMessageHistory(
             @RequestParam(defaultValue = "50") @Min(1) @Max(500) Integer limit,
             Authentication authentication) {
 
         try {
             Integer userId = (Integer) authentication.getPrincipal();
+            String username = (String) authentication.getCredentials();
 
             log.debug("User {} requesting message history (limit: {})", userId, limit);
 
-            List<MessageResponse> messages = messageService.getUserMessageHistory(userId, limit);
+            Object messageHistory = messageService.getMessageHistory(userId, username, limit);
 
-            return ResponseEntity.ok(ApiResponse.success("Message history retrieved successfully", messages));
-
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid message history request: {}", e.getMessage());
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("Invalid request: " + e.getMessage()));
+            return ResponseEntity.ok(ApiResponse.success("Message history retrieved successfully", messageHistory));
 
         } catch (Exception e) {
             log.error("Error retrieving message history: {}", e.getMessage(), e);
@@ -181,46 +166,22 @@ public class MessageController {
     }
 
     /**
-     * Health check endpoint for the message service
-     * Can be used by load balancers or monitoring systems
-     */
-    @GetMapping("/health")
-    public ResponseEntity<ApiResponse<String>> healthCheck() {
-        return ResponseEntity.ok(ApiResponse.success("Message service is running"));
-    }
-
-    /**
-     * Get conversation summary between authenticated user and another user
-     * Returns only basic conversation info without message list
+     * Get conversation summary
      */
     @GetMapping("/conversation/{otherUserId}/summary")
-    public ResponseEntity<ApiResponse<ConversationResponse>> getConversationSummary(
+    public ResponseEntity<ApiResponse<Object>> getConversationSummary(
             @PathVariable Integer otherUserId,
             Authentication authentication) {
 
         try {
             Integer userId = (Integer) authentication.getPrincipal();
+            String username = (String) authentication.getCredentials();
 
             log.debug("User {} requesting conversation summary with user {}", userId, otherUserId);
 
-            // Get conversation but we'll create a summary version
-            ConversationResponse fullConversation = messageService.getConversation(userId, otherUserId);
-
-            // Create summary without messages
-            ConversationResponse summary = ConversationResponse.summary(
-                    fullConversation.otherUserId(),
-                    fullConversation.otherUsername(),
-                    fullConversation.lastMessage(),
-                    fullConversation.lastMessageTime(),
-                    fullConversation.totalMessages()
-            );
+            Object summary = messageService.getConversationSummary(userId, username, otherUserId);
 
             return ResponseEntity.ok(ApiResponse.success("Conversation summary retrieved successfully", summary));
-
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid conversation summary request: {}", e.getMessage());
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("Invalid request: " + e.getMessage()));
 
         } catch (Exception e) {
             log.error("Error retrieving conversation summary: {}", e.getMessage(), e);
@@ -230,37 +191,18 @@ public class MessageController {
     }
 
     /**
-     * Get basic statistics about user's messaging activity
-     * Returns total sent, received, and conversation count
+     * Get message statistics for the authenticated user
      */
     @GetMapping("/stats")
-    public ResponseEntity<ApiResponse<MessageStatsResponse>> getMessageStats(
-            Authentication authentication) {
+    public ResponseEntity<ApiResponse<Object>> getMessageStats(Authentication authentication) {
 
         try {
             Integer userId = (Integer) authentication.getPrincipal();
+            String username = (String) authentication.getCredentials();
 
             log.debug("User {} requesting message statistics", userId);
 
-            // Get user conversations to calculate stats
-            List<ConversationResponse> conversations = messageService.getUserConversations(userId);
-            List<MessageResponse> messageHistory = messageService.getUserMessageHistory(userId, 1000);
-
-            // Calculate statistics
-            int totalConversations = conversations.size();
-            long totalSent = messageHistory.stream()
-                    .mapToLong(msg -> msg.senderId().equals(userId) ? 1 : 0)
-                    .sum();
-            long totalReceived = messageHistory.stream()
-                    .mapToLong(msg -> msg.receiverId().equals(userId) ? 1 : 0)
-                    .sum();
-
-            MessageStatsResponse stats = new MessageStatsResponse(
-                    totalConversations,
-                    (int) totalSent,
-                    (int) totalReceived,
-                    messageHistory.size()
-            );
+            Object stats = messageService.getMessageStats(userId, username);
 
             return ResponseEntity.ok(ApiResponse.success("Message statistics retrieved successfully", stats));
 
@@ -270,14 +212,4 @@ public class MessageController {
                     .body(ApiResponse.error("Failed to retrieve message statistics"));
         }
     }
-
-    /**
-     * Internal DTO for message statistics
-     */
-    public record MessageStatsResponse(
-            int totalConversations,
-            int totalSent,
-            int totalReceived,
-            int totalMessages
-    ) {}
 }

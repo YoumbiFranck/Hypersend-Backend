@@ -46,8 +46,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.register_user
-    ports:
-      - "8081:8081"
+    #ports:
+      #- "8081:8081"
     networks:
       - hps_network
     environment:
@@ -77,8 +77,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.login_user
-    ports:
-      - "8082:8082"
+    #ports:
+     # - "8082:8082"
     networks:
       - hps_network
     environment:
@@ -106,8 +106,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.message_service
-    ports:
-      - "8083:8083"
+    #ports:
+      #- "8083:8083"
     networks:
       - hps_network
     environment:
@@ -125,6 +125,22 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # API Gateway
+  api-gateway:
+    container_name: hps_api_gateway
+    build:
+      context: .
+      dockerfile: Dockerfile.api_gateway
+    ports:
+      - "8080:8080"
+    networks:
+      - hps_network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      - register-user-service
+      - login-user-service
+      - message-service
 networks:
   hps_network:
     driver: bridge

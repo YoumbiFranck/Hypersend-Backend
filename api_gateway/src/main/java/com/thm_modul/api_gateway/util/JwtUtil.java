@@ -1,4 +1,4 @@
-package com.thm_modul.message_service.util;
+package com.thm_modul.api_gateway.util;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
@@ -22,17 +22,15 @@ public class JwtUtil {
 
     /**
      * Initialize the signing key after properties are loaded
-     * Uses HMAC-SHA256 algorithm for token signing
      */
     @PostConstruct
     public void init() {
         this.key = Keys.hmacShaKeyFor(secret.getBytes());
-        log.debug("JWT utility initialized with secret key");
+        log.debug("JWT utility initialized for API Gateway");
     }
 
     /**
      * Extract username from JWT token
-     * Returns the subject claim which contains the username
      */
     public String extractUsername(String token) {
         try {
@@ -45,7 +43,7 @@ public class JwtUtil {
 
     /**
      * Extract user ID from JWT token
-     * Returns the custom userId claim added during token generation
+     * This is critical for API Gateway to identify users for downstream services
      */
     public Integer getUserIdFromToken(String token) {
         try {
@@ -53,7 +51,6 @@ public class JwtUtil {
             Object userIdObj = claims.get("userId");
 
             if (userIdObj != null) {
-                // Handle both Integer and String representations
                 if (userIdObj instanceof Integer) {
                     return (Integer) userIdObj;
                 } else if (userIdObj instanceof String) {
@@ -63,7 +60,7 @@ public class JwtUtil {
                 }
             }
 
-            log.warn("No userId found in token claims");
+            log.warn("No valid userId found in token claims");
             return null;
 
         } catch (Exception e) {
@@ -74,7 +71,6 @@ public class JwtUtil {
 
     /**
      * Extract expiration date from JWT token
-     * Used for token validation
      */
     public Date extractExpiration(String token) {
         try {
@@ -86,8 +82,7 @@ public class JwtUtil {
     }
 
     /**
-     * Extract a specific claim from JWT token using a claims resolver function
-     * Generic method for extracting any claim type
+     * Extract a specific claim from JWT token
      */
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         try {
@@ -101,7 +96,6 @@ public class JwtUtil {
 
     /**
      * Extract all claims from JWT token
-     * Private method used by other extraction methods
      */
     private Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
@@ -113,7 +107,6 @@ public class JwtUtil {
 
     /**
      * Check if JWT token is expired
-     * Compares token expiration with current time
      */
     public Boolean isTokenExpired(String token) {
         try {
@@ -126,8 +119,7 @@ public class JwtUtil {
     }
 
     /**
-     * Validate JWT token
-     * Checks signature validity and expiration
+     * Validate JWT token - main method used by authentication filter
      */
     public Boolean validateToken(String token) {
         if (token == null || token.trim().isEmpty()) {
@@ -169,60 +161,7 @@ public class JwtUtil {
     }
 
     /**
-     * Validate JWT token with additional username verification
-     * Useful when you want to ensure token belongs to specific user
-     */
-    public Boolean validateToken(String token, String expectedUsername) {
-        if (!validateToken(token)) {
-            return false;
-        }
-
-        try {
-            String tokenUsername = extractUsername(token);
-            boolean usernameMatches = expectedUsername.equals(tokenUsername);
-
-            if (!usernameMatches) {
-                log.warn("Token username '{}' does not match expected username '{}'",
-                        tokenUsername, expectedUsername);
-            }
-
-            return usernameMatches;
-
-        } catch (Exception e) {
-            log.warn("Error validating token with username: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Validate JWT token with additional user ID verification
-     * Useful when you want to ensure token belongs to specific user ID
-     */
-    public Boolean validateToken(String token, Integer expectedUserId) {
-        if (!validateToken(token)) {
-            return false;
-        }
-
-        try {
-            Integer tokenUserId = getUserIdFromToken(token);
-            boolean userIdMatches = expectedUserId.equals(tokenUserId);
-
-            if (!userIdMatches) {
-                log.warn("Token user ID '{}' does not match expected user ID '{}'",
-                        tokenUserId, expectedUserId);
-            }
-
-            return userIdMatches;
-
-        } catch (Exception e) {
-            log.warn("Error validating token with user ID: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Get token type from claims
-     * Useful to distinguish between access and refresh tokens
+     * Get token type from claims (access vs refresh)
      */
     public String getTokenType(String token) {
         try {
@@ -237,7 +176,6 @@ public class JwtUtil {
 
     /**
      * Check if token is a refresh token
-     * Returns true if token has type "refresh"
      */
     public Boolean isRefreshToken(String token) {
         String tokenType = getTokenType(token);
@@ -246,7 +184,6 @@ public class JwtUtil {
 
     /**
      * Get remaining time until token expiration in milliseconds
-     * Returns negative value if token is expired
      */
     public Long getTimeUntilExpiration(String token) {
         try {
@@ -257,36 +194,6 @@ public class JwtUtil {
             return null;
         } catch (Exception e) {
             log.warn("Error calculating time until expiration: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Extract issued at time from token
-     * Useful for token age calculations
-     */
-    public Date extractIssuedAt(String token) {
-        try {
-            return extractClaim(token, Claims::getIssuedAt);
-        } catch (Exception e) {
-            log.warn("Failed to extract issued at time: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Calculate token age in milliseconds
-     * Returns time since token was issued
-     */
-    public Long getTokenAge(String token) {
-        try {
-            Date issuedAt = extractIssuedAt(token);
-            if (issuedAt != null) {
-                return System.currentTimeMillis() - issuedAt.getTime();
-            }
-            return null;
-        } catch (Exception e) {
-            log.warn("Error calculating token age: {}", e.getMessage());
             return null;
         }
     }

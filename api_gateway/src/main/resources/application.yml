@@ -73,13 +73,16 @@ app:
 
   # Internal service URLs in Docker network
   register-service:
-    url: ${REGISTER_SERVICE_URL:http://hps_register_user:8081}
+    #url: ${REGISTER_SERVICE_URL:http://hps_register_user:8081}
+    url: ${REGISTER_SERVICE_URL:http://register-user-service:8081}
 
   login-service:
-    url: ${LOGIN_SERVICE_URL:http://hps_login_user:8082}
+    #url: ${LOGIN_SERVICE_URL:http://hps_login_user:8082}
+    url: ${LOGIN_SERVICE_URL:http://login-user-service:8082}
 
   message-service:
-    url: ${MESSAGE_SERVICE_URL:http://hps_message_service:8083}
+    # url: ${MESSAGE_SERVICE_URL:http://hps_message_service:8083}
+    url: ${MESSAGE_SERVICE_URL:http://message-service:8083}
 
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8080}

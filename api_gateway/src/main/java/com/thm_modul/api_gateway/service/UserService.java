@@ -6,6 +6,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClientResponseException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
 
 import java.util.Map;
 
@@ -35,12 +41,16 @@ public class UserService {
 
             String url = registerServiceUrl + "/internal/v1/register";
 
+            log.debug("Sending registration request to URL: {}", url);
+
             ResponseEntity<Map> response = restTemplate.exchange(
                     url,
                     HttpMethod.POST,
                     requestEntity,
                     Map.class
             );
+
+            log.debug("Registration response: {}", response.getBody());
 
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                 Map<String, Object> responseBody = response.getBody();

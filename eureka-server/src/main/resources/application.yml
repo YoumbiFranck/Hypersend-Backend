@@ -1,0 +1,75 @@
+# Default profile configuration (for local development)
+server:
+  port: 8761
+
+spring:
+  application:
+    name: eureka-server
+
+eureka:
+  instance:
+    hostname: localhost
+    prefer-ip-address: false
+  client:
+    # Ne pas s'enregistrer en tant que client
+    register-with-eureka: false
+    # Ne pas récupérer le registre (serveur autonome)
+    fetch-registry: false
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  server:
+    # Désactiver l'auto-protection en développement
+    enable-self-preservation: false
+    # Délai d'expiration des services (utile en dev)
+    eviction-interval-timer-in-ms: 10000
+    # Délai de renouvellement attendu
+    expected-client-renewal-interval-seconds: 30
+
+# Logging configuration
+logging:
+  level:
+    com.netflix.eureka: INFO
+    com.netflix.discovery: INFO
+    com.thm_modul.eureka_server: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,eureka
+  endpoint:
+    health:
+      show-details: always
+
+---
+# Docker profile configuration
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+eureka:
+  instance:
+    hostname: eureka-server
+    prefer-ip-address: true
+    # IP à utiliser dans Docker
+    ip-address: eureka-server
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+  server:
+    enable-self-preservation: true
+    eviction-interval-timer-in-ms: 60000
+    expected-client-renewal-interval-seconds: 30
+
+# Logging pour Docker
+logging:
+  level:
+    com.netflix.eureka: INFO
+    com.netflix.discovery: INFO
+    com.thm_modul.eureka_server: INFO

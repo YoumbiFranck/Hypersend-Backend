@@ -1,22 +1,99 @@
 services:
-  # PostgreSQL Database
-  hps_postgres:
-    container_name: hps_postgres_db
+  # Load Balancer HAProxy
+  load-balancer:
+    container_name: hps_load_balancer
+    build:
+      context: .
+      dockerfile: Dockerfile.haproxy
+    ports:
+      - "80:80"
+      - "8404:8404"  # Stats interface
+    networks:
+      - hps_network
+    depends_on:
+      - api-gateway-1
+      - api-gateway-2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8404/stats || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Service Registry - Eureka Server
+  eureka-server:
+    container_name: hps_eureka_server
+    build:
+      context: .
+      dockerfile: Dockerfile.eureka_server
+    ports:
+      - "8761:8761"
+    networks:
+      - hps_network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    volumes:
+      - ./eureka-server/src:/app/eureka-server/src
+      - ./pom.xml:/app/pom.xml
+      - ./eureka-server/pom.xml:/app/eureka-server/pom.xml
+      - maven_cache:/root/.m2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8761/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # PostgreSQL Master
+  postgres-master:
+    container_name: hps_postgres_master
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      PGDATA: /data/hps_postgres
+      POSTGRES_DB: ${POSTGRES_DB:-hypersend}
+      PGDATA: /data/postgres-master
     volumes:
-      - hps_postgres_data:/data/hps_postgres
+      - postgres_master_data:/data/postgres-master
+      - postgres_archive:/var/lib/postgresql/archive
       - ./init:/docker-entrypoint-initdb.d
+      - ./postgres-master/setup-master.sh:/docker-entrypoint-initdb.d/99-setup-master.sh
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "5432:5432"
     networks:
       - hps_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-hypersend}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s  # Give time for initialization scripts
+
+  # PostgreSQL Slave
+  postgres-slave:
+    container_name: hps_postgres_slave
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-hypersend}
+      PGDATA: /data/postgres-slave
+    volumes:
+      - postgres_slave_data:/data/postgres-slave
+      - ./postgres-slave/start-slave.sh:/start-slave.sh
+    ports:
+      - "5433:5432"
+    networks:
+      - hps_network
+    depends_on:
+      postgres-master:
+        condition: service_healthy
+    restart: unless-stopped
+    command: [ "bash", "/start-slave.sh" ]
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -38,117 +115,234 @@ services:
       - hps_network
     restart: unless-stopped
     depends_on:
-      - hps_postgres
+      - postgres-master
 
-  # Register User Microservice
-  register-user-service:
-    container_name: hps_register_user
+  # API Gateway - Instance 1
+  api-gateway-1:
+    container_name: hps_api_gateway_1
+    build:
+      context: .
+      dockerfile: Dockerfile.api_gateway
+    networks:
+      - hps_network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SERVER_PORT=8080
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+      - EUREKA_INSTANCE_INSTANCE_ID=api-gateway-1
+    volumes:
+      - ./api_gateway/src:/app/api_gateway/src
+      - ./pom.xml:/app/pom.xml
+      - ./api_gateway/pom.xml:/app/api_gateway/pom.xml
+      - maven_cache:/root/.m2
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # API Gateway - Instance 2
+  api-gateway-2:
+    container_name: hps_api_gateway_2
+    build:
+      context: .
+      dockerfile: Dockerfile.api_gateway
+    networks:
+      - hps_network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SERVER_PORT=8080
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+      - EUREKA_INSTANCE_INSTANCE_ID=api-gateway-2
+    volumes:
+      - ./api_gateway/src:/app/api_gateway/src
+      - ./pom.xml:/app/pom.xml
+      - ./api_gateway/pom.xml:/app/api_gateway/pom.xml
+      - maven_cache:/root/.m2
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Register User Service - Instance 1
+  register-user-service-1:
+    container_name: hps_register_user_1
     build:
       context: .
       dockerfile: Dockerfile.register_user
-    #ports:
-      #- "8081:8081"
     networks:
       - hps_network
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://hps_postgres:5432/${POSTGRES_DB:-hypersend}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-master:5432/${POSTGRES_DB:-hypersend}
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
-      - SERVER_PORT=8082
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+      - EUREKA_INSTANCE_INSTANCE_ID=register-user-1
       - SERVER_PORT=8081
     volumes:
-      # Mount source code for hot reload during development
       - ./register_user/src:/app/register_user/src
       - ./pom.xml:/app/pom.xml
       - ./register_user/pom.xml:/app/register_user/pom.xml
-      # Maven cache volume for faster builds
       - maven_cache:/root/.m2
     depends_on:
-      hps_postgres:
+      postgres-master:
+        condition: service_healthy
+      eureka-server:
         condition: service_healthy
     restart: unless-stopped
-    stdin_open: true
-    tty: true
 
-  # Login User Microservice
-  login-user-service:
-    container_name: hps_login_user
+  # Register User Service - Instance 2
+  register-user-service-2:
+    container_name: hps_register_user_2
+    build:
+      context: .
+      dockerfile: Dockerfile.register_user
+    networks:
+      - hps_network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-slave:5432/${POSTGRES_DB:-hypersend}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+      - EUREKA_INSTANCE_INSTANCE_ID=register-user-2
+      - SERVER_PORT=8081
+    volumes:
+      - ./register_user/src:/app/register_user/src
+      - ./pom.xml:/app/pom.xml
+      - ./register_user/pom.xml:/app/register_user/pom.xml
+      - maven_cache:/root/.m2
+    depends_on:
+      postgres-slave:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Login User Service - Instance 1
+  login-user-service-1:
+    container_name: hps_login_user_1
     build:
       context: .
       dockerfile: Dockerfile.login_user
-    #ports:
-     # - "8082:8082"
     networks:
       - hps_network
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://hps_postgres:5432/${POSTGRES_DB:-hypersend}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-master:5432/${POSTGRES_DB:-hypersend}
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+      - EUREKA_INSTANCE_INSTANCE_ID=login-user-1
+      - SERVER_PORT=8082
     volumes:
-      # Mount source code for hot reload during development
       - ./login_user/src:/app/login_user/src
       - ./pom.xml:/app/pom.xml
       - ./login_user/pom.xml:/app/login_user/pom.xml
-      # Maven cache volume for faster builds
       - maven_cache:/root/.m2
     depends_on:
-      hps_postgres:
+      postgres-master:
+        condition: service_healthy
+      eureka-server:
         condition: service_healthy
     restart: unless-stopped
-    stdin_open: true
-    tty: true
 
-  # Message Microservice
-  message-service:
-    container_name: hps_message_service
+  # Login User Service - Instance 2
+  login-user-service-2:
+    container_name: hps_login_user_2
     build:
       context: .
-      dockerfile: Dockerfile.message_service
-    #ports:
-      #- "8083:8083"
+      dockerfile: Dockerfile.login_user
     networks:
       - hps_network
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://hps_postgres:5432/${POSTGRES_DB:-hypersend}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-slave:5432/${POSTGRES_DB:-hypersend}
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+      - EUREKA_INSTANCE_INSTANCE_ID=login-user-2
+      - SERVER_PORT=8082
+    volumes:
+      - ./login_user/src:/app/login_user/src
+      - ./pom.xml:/app/pom.xml
+      - ./login_user/pom.xml:/app/login_user/pom.xml
+      - maven_cache:/root/.m2
+    depends_on:
+      postgres-slave:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Message Service - Instance 1
+  message-service-1:
+    container_name: hps_message_service_1
+    build:
+      context: .
+      dockerfile: Dockerfile.message_service
+    networks:
+      - hps_network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-master:5432/${POSTGRES_DB:-hypersend}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+      - EUREKA_INSTANCE_INSTANCE_ID=message-service-1
+      - SERVER_PORT=8083
     volumes:
       - ./message_service/src:/app/message_service/src
       - ./pom.xml:/app/pom.xml
       - ./message_service/pom.xml:/app/message_service/pom.xml
       - maven_cache:/root/.m2
     depends_on:
-      hps_postgres:
+      postgres-master:
+        condition: service_healthy
+      eureka-server:
         condition: service_healthy
     restart: unless-stopped
 
-  # API Gateway
-  api-gateway:
-    container_name: hps_api_gateway
+  # Message Service - Instance 2
+  message-service-2:
+    container_name: hps_message_service_2
     build:
       context: .
-      dockerfile: Dockerfile.api_gateway
-    ports:
-      - "8080:8080"
+      dockerfile: Dockerfile.message_service
     networks:
       - hps_network
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-slave:5432/${POSTGRES_DB:-hypersend}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+      - EUREKA_INSTANCE_INSTANCE_ID=message-service-2
+      - SERVER_PORT=8083
+    volumes:
+      - ./message_service/src:/app/message_service/src
+      - ./pom.xml:/app/pom.xml
+      - ./message_service/pom.xml:/app/message_service/pom.xml
+      - maven_cache:/root/.m2
     depends_on:
-      - register-user-service
-      - login-user-service
-      - message-service
+      postgres-slave:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    restart: unless-stopped
+
 networks:
   hps_network:
     driver: bridge
     name: hypersend_network
 
 volumes:
-  hps_postgres_data:
-    name: hypersend_postgres_data
+  postgres_master_data:
+    name: hypersend_postgres_master_data
+  postgres_slave_data:
+    name: hypersend_postgres_slave_data
+  postgres_archive:
+    name: hypersend_postgres_archive
   hps_pgadmin_data:
     name: hypersend_pgadmin_data
   maven_cache:

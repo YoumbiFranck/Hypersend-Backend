@@ -1,10 +1,10 @@
 # Default profile configuration (for local development with IDE)
 server:
-  port: 8081
+  port: 8083
 
 spring:
   application:
-    name: register-service
+    name: message-service
 
   datasource:
     url: jdbc:postgresql://localhost:5433/hypersend
@@ -12,12 +12,12 @@ spring:
     password: ${POSTGRES_PASSWORD:hypersend_password}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
+      maximum-pool-size: 15
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
-      pool-name: HikariPool-RegisterUser
-      minimum-idle: 2
+      pool-name: HikariPool-MessageService
+      minimum-idle: 3
 
   jpa:
     hibernate:
@@ -27,40 +27,46 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 
   jackson:
     serialization:
       indent_output: true
+    default-property-inclusion: non_null
 
-# Application configuration
+# Application specific configuration
 app:
   # Gateway authentication secret for internal communications
   gateway:
     secret: ${GATEWAY_SECRET:shared_secret_key}
 
-  # User validation settings
-  validation:
-    password:
-      min-length: 8
-      max-length: 255
-    username:
-      min-length: 3
-      max-length: 50
-    email:
-      max-length: 255
+  # Login service configuration for inter-service calls
+  login-service:
+    url: ${LOGIN_SERVICE_URL:http://hps_login_user:8082}
+  user-cache:
+    enabled: true
+    ttl: 300000
+  message:
+    max-content-length: 1000
+    default-page-size: 20
+    max-page-size: 100
+    max-history-limit: 500
 
-# Logging configuration
+# Logging configuration for containerized environment
 logging:
   level:
-    com.thm_modul.register_user: DEBUG
+    com.thm_modul.message_service: DEBUG
     org.springframework.security: INFO
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.SQL: INFO
+    org.springframework.web.client.RestTemplate: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
-# Management endpoints configuration
+# Management endpoints (same for all profiles)
 management:
   endpoints:
     web:
@@ -68,7 +74,19 @@ management:
         include: health,info,metrics
   endpoint:
     health:
-      show-details: when_authorized
+      show-details: always
+
+  # User cache configuration
+  user-cache:
+    enabled: true
+    ttl: 300000  # 5 minutes in milliseconds
+
+  # Message service specific settings
+  message:
+    max-content-length: 1000
+    default-page-size: 20
+    max-page-size: 100
+    max-history-limit: 500
 
 ---
 # Docker profile configuration (when running inside containers)
@@ -83,12 +101,12 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
+      maximum-pool-size: 15
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
-      pool-name: HikariPool-RegisterUser-Docker
-      minimum-idle: 2
+      pool-name: HikariPool-MessageService-Docker
+      minimum-idle: 3
 
   jpa:
     hibernate:
@@ -97,40 +115,19 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 
   jackson:
     serialization:
       indent_output: false
 
-# Application configuration (same for all profiles)
+# Application specific configuration (same for all profiles)
 app:
   gateway:
     secret: ${GATEWAY_SECRET:shared_secret_key}
-  validation:
-    password:
-      min-length: 8
-      max-length: 255
-    username:
-      min-length: 3
-      max-length: 50
-    email:
-      max-length: 255
-
-# Logging configuration for containerized environment
-logging:
-  level:
-    com.thm_modul.register_user: DEBUG
-    org.springframework.security: INFO
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-
-# Management endpoints (same for all profiles)
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-  endpoint:
-    health:
-      show-details: always
+  login-service:
+    url: ${LOGIN_SERVICE_URL:http://hps_login_user:8082}

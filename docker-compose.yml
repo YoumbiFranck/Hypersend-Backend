@@ -170,7 +170,9 @@ services:
       context: .
       dockerfile: Dockerfile.register_user
     networks:
-      - hps_network
+      hps_network:
+        aliases:
+          - register-user-service
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-master:5432/${POSTGRES_DB:-hypersend}
@@ -226,7 +228,9 @@ services:
       context: .
       dockerfile: Dockerfile.login_user
     networks:
-      - hps_network
+      hps_network:
+        aliases:
+          - login-user-service
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-master:5432/${POSTGRES_DB:-hypersend}
@@ -282,7 +286,9 @@ services:
       context: .
       dockerfile: Dockerfile.message_service
     networks:
-      - hps_network
+      hps_network:
+        aliases:
+          - message-service
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-master:5432/${POSTGRES_DB:-hypersend}

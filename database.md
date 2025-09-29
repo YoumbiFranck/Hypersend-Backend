@@ -83,3 +83,101 @@ docker-compose up -d hps_postgres
 docker-compose logs hps_postgres_db
 ```
 
+
+---
+
+Vous avez plusieurs options pour vous connecter à votre base de données PostgreSQL.
+
+## Option 1 : Via pgAdmin (Interface graphique)
+
+pgAdmin est déjà configuré et accessible :
+
+```
+URL: http://localhost:5051
+Email: admin@hypersend.com
+Password: admin123
+```
+
+**Ajouter une connexion au Master :**
+1. Cliquez sur "Add New Server"
+2. Onglet "General" : Name = `PostgreSQL Master`
+3. Onglet "Connection" :
+    - Host: `hps_postgres_master`
+    - Port: `5432`
+    - Database: `hypersend`
+    - Username: `hypersend_user`
+    - Password: `hypersend_password`
+
+**Ajouter une connexion au Slave :**
+1. Même processus avec :
+    - Host: `hps_postgres_slave`
+    - Port: `5432`
+
+## Option 2 : Via ligne de commande (psql)
+
+**Connexion au Master :**
+```bash
+docker exec -it hps_postgres_master psql -U hypersend_user -d hypersend
+```
+
+**Connexion au Slave (lecture seule) :**
+```bash
+docker exec -it hps_postgres_slave psql -U hypersend_user -d hypersend
+```
+
+**Depuis votre machine locale :**
+```bash
+# Master
+psql -h localhost -p 5432 -U hypersend_user -d hypersend
+
+# Slave
+psql -h localhost -p 5433 -U hypersend_user -d hypersend
+```
+
+## Option 3 : Via un client SQL (DBeaver, DataGrip, etc.)
+
+**Configuration Master :**
+- Host: `localhost`
+- Port: `5432`
+- Database: `hypersend`
+- Username: `hypersend_user`
+- Password: `hypersend_password`
+
+**Configuration Slave :**
+- Host: `localhost`
+- Port: `5433`
+- Database: `hypersend`
+- Username: `hypersend_user`
+- Password: `hypersend_password`
+
+## Commandes SQL utiles une fois connecté
+
+```sql
+-- Lister les tables
+\dt
+
+-- Voir les utilisateurs
+SELECT * FROM app_user;
+
+-- Voir les messages
+SELECT * FROM messages;
+
+-- Vérifier le statut de réplication (sur le Master)
+SELECT * FROM pg_stat_replication;
+
+-- Vérifier si c'est un slave (sur le Slave)
+SELECT pg_is_in_recovery();
+```
+
+## Tester la réplication
+
+```sql
+-- Sur le Master, insérer des données
+INSERT INTO app_user (user_name, email, password, enabled) 
+VALUES ('test_user', 'test@example.com', 'password123', true);
+
+-- Sur le Slave, vérifier que les données sont répliquées
+SELECT * FROM app_user WHERE user_name = 'test_user';
+```
+
+La méthode la plus simple pour débuter est pgAdmin via votre navigateur.

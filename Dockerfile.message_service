@@ -1,0 +1,25 @@
+# Dockerfile for message_service microservice
+FROM openjdk:17-jdk-slim
+
+# Install Maven for development mode
+RUN apt-get update && apt-get install -y maven && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy parent pom first for dependency resolution
+COPY pom.xml .
+COPY message_service/pom.xml ./message_service/
+
+# Download dependencies (this layer will be cached if pom.xml doesn't change)
+RUN mvn dependency:go-offline -f message_service/pom.xml
+
+# Copy source code
+COPY message_service/src ./message_service/src
+
+# Expose port
+EXPOSE 8083
+
+# Development mode with hot reload
+# Using spring-boot:run with fork=false for faster startup
+CMD ["mvn", "-f", "message_service/pom.xml", "spring-boot:run", "-Dspring-boot.run.fork=false"]

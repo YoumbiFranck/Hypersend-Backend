@@ -1,0 +1,133 @@
+# Default profile configuration (for local development with IDE)
+server:
+  port: 8083
+
+spring:
+  application:
+    name: message-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5433/hypersend
+    username: ${POSTGRES_USER:hypersend_user}
+    password: ${POSTGRES_PASSWORD:hypersend_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 15
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: HikariPool-MessageService
+      minimum-idle: 3
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+  jackson:
+    serialization:
+      indent_output: true
+    default-property-inclusion: non_null
+
+# Application specific configuration
+app:
+  # Gateway authentication secret for internal communications
+  gateway:
+    secret: ${GATEWAY_SECRET:shared_secret_key}
+
+  # Login service configuration for inter-service calls
+  login-service:
+    url: ${LOGIN_SERVICE_URL:http://hps_login_user:8082}
+  user-cache:
+    enabled: true
+    ttl: 300000
+  message:
+    max-content-length: 1000
+    default-page-size: 20
+    max-page-size: 100
+    max-history-limit: 500
+
+# Logging configuration for containerized environment
+logging:
+  level:
+    com.thm_modul.message_service: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: INFO
+    org.springframework.web.client.RestTemplate: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management endpoints (same for all profiles)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+  # User cache configuration
+  user-cache:
+    enabled: true
+    ttl: 300000  # 5 minutes in milliseconds
+
+  # Message service specific settings
+  message:
+    max-content-length: 1000
+    default-page-size: 20
+    max-page-size: 100
+    max-history-limit: 500
+
+---
+# Docker profile configuration (when running inside containers)
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://hps_postgres:5432/hypersend}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 15
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: HikariPool-MessageService-Docker
+      minimum-idle: 3
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+  jackson:
+    serialization:
+      indent_output: false
+
+# Application specific configuration (same for all profiles)
+app:
+  gateway:
+    secret: ${GATEWAY_SECRET:shared_secret_key}
+  login-service:
+    url: ${LOGIN_SERVICE_URL:http://hps_login_user:8082}

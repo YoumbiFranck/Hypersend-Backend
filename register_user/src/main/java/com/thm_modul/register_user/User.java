@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import javax.persistence.*;
 
+//Hibernate/JPA
 @Data
 @Builder
 @AllArgsConstructor

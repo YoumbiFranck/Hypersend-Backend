@@ -1,0 +1,17 @@
+# Dockerfile for HAProxy Load Balancer
+FROM haproxy:2.8-alpine
+
+# Switch to root to install packages
+USER root
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Copy HAProxy configuration
+COPY haproxy/haproxy.cfg /usr/local/etc/haproxy/haproxy.cfg
+
+# Expose ports
+EXPOSE 80 8404
+
+# Run HAProxy (will run as root, HAProxy drops privileges internally)
+CMD ["haproxy", "-f", "/usr/local/etc/haproxy/haproxy.cfg"]

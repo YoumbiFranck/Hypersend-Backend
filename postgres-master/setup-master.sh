@@ -3,7 +3,6 @@ set -e
 
 echo "Configuration du PostgreSQL Master..."
 
-# Configuration PostgreSQL pour la réplication
 cat >> ${PGDATA}/postgresql.conf <<EOF
 
 # Configuration pour Master-Slave Replication
@@ -19,7 +18,6 @@ listen_addresses = '*'
 max_connections = 100
 EOF
 
-# Configuration de l'authentification pour la réplication
 cat >> ${PGDATA}/pg_hba.conf <<EOF
 
 # Configuration pour la réplication
@@ -27,8 +25,7 @@ host    replication     replicator      all                     md5
 host    all             all             172.0.0.0/8             md5
 EOF
 
-# Créer le répertoire d'archive
 mkdir -p /var/lib/postgresql/archive
 chown postgres:postgres /var/lib/postgresql/archive
 
-echo "Configuration Master terminée"
+echo "Configuration Master finished.."

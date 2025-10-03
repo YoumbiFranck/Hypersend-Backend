@@ -1,6 +1,4 @@
 #!/bin/bash
-# Fixed script for PostgreSQL Slave configuration
-# File: postgres-slave/setup-slave.sh
 
 set -e
 

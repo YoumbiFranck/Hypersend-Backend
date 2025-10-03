@@ -7,5 +7,5 @@
                                                             REGISTER SERVICE v1.0
 
 =========================================================
- Register Service - register new users into the system
+ Register Service - register new users into the system (Made by Youmbi Franck :)
 =========================================================

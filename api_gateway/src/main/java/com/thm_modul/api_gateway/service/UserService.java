@@ -164,12 +164,6 @@ public class UserService {
         }
 
         try {
-            // For now, this is a placeholder implementation
-            // In a real system, you might:
-            // 1. Call a dedicated user search service
-            // 2. Use a search engine like Elasticsearch
-            // 3. Query the user database with LIKE operators
-
             log.debug("User search not fully implemented - query: '{}', limit: {}", query, limit);
 
             // Return empty results for now

@@ -11,18 +11,13 @@ eureka:
     hostname: localhost
     prefer-ip-address: false
   client:
-    # Ne pas s'enregistrer en tant que client
     register-with-eureka: false
-    # Ne pas récupérer le registre (serveur autonome)
     fetch-registry: false
     service-url:
       defaultZone: http://localhost:8761/eureka/
   server:
-    # Désactiver l'auto-protection en développement
     enable-self-preservation: false
-    # Délai d'expiration des services (utile en dev)
     eviction-interval-timer-in-ms: 10000
-    # Délai de renouvellement attendu
     expected-client-renewal-interval-seconds: 30
 
 # Logging configuration
@@ -55,7 +50,6 @@ eureka:
   instance:
     hostname: eureka-server
     prefer-ip-address: true
-    # IP à utiliser dans Docker
     ip-address: eureka-server
   client:
     register-with-eureka: false
@@ -67,7 +61,7 @@ eureka:
     eviction-interval-timer-in-ms: 60000
     expected-client-renewal-interval-seconds: 30
 
-# Logging pour Docker
+# Logging configuration for Docker profile
 logging:
   level:
     com.netflix.eureka: INFO

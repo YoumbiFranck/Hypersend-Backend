@@ -69,7 +69,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s  # Give time for initialization scripts
+      start_period: 30s
 
   # PostgreSQL Slave
   postgres-slave:

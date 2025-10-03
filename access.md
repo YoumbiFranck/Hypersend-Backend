@@ -1,4 +1,4 @@
-Points d'accès
+Server Access Information
 
 Load Balancer : http://localhost (port 80)
 HAProxy Stats : http://localhost:8404/stats (admin/hypersend2024)
@@ -8,8 +8,6 @@ PostgreSQL Slave : localhost:5433
 pgAdmin : http://localhost:5051
 
 ---
-
-Voici les requêtes simplifiées pour Postman :
 
 ## 1. AUTHENTICATION
 
@@ -146,13 +144,3 @@ GET http://localhost:8761/
 GET http://localhost:8761/eureka/apps
 ```
 
-## Ordre de test recommandé :
-
-1. **Register User** → crée un nouvel utilisateur
-2. **Login** → récupère le `accessToken` (copiez-le !)
-3. **Get Current User** → teste l'authentification
-4. **Send Message** → envoie un message à l'utilisateur ID 2
-5. **Get Conversations** → voir toutes les conversations
-6. **Get Message Stats** → statistiques
-
-**Note :** Remplacez `YOUR_ACCESS_TOKEN` par le token obtenu lors du login.
